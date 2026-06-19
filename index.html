@@ -14,12 +14,43 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Inter:wght@100..900&display=swap" rel="stylesheet">
   
-  <!-- React and ReactDOM CDNs (Production versions) -->
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <!-- React and ReactDOM CDNs (Production versions) using jsDelivr for superior reliability -->
+  <script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
   
-  <!-- Babel Standalone for in-browser JSX compilation -->
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- Babel Standalone for in-browser JSX compilation using jsDelivr -->
+  <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7/babel.min.js"></script>
+
+  <!-- Global Error Logger/Overlay -->
+  <div id="error-boundary-overlay" style="display:none; position:fixed; inset:0; background:rgba(42,26,14,0.95); color:#ff8a80; padding:30px; font-family:monospace; z-index:99999; overflow-y:auto; font-size:14px; line-height:1.5; border:5px solid #c0392b;">
+    <h2 style="color:#ff5252; margin-top:0; border-bottom:2px solid #ff5252; padding-bottom:10px; font-family:sans-serif;">⚠️ Kaneez Creations - Loading or Script Error</h2>
+    <p style="color:#fff; font-family:sans-serif;">An unexpected error occurred while loading the application. See details below:</p>
+    <pre id="error-boundary-details" style="background:#212121; padding:15px; border-radius:8px; border:1px solid #424242; white-space:pre-wrap; word-break:break-all; color:#ff8a80;"></pre>
+    <button onclick="window.location.reload()" style="background:#c0392b; color:#fff; border:none; padding:10px 20px; border-radius:4px; font-weight:bold; cursor:pointer; margin-top:15px; font-family:sans-serif; transition: background 0.2s;">Reload Page</button>
+  </div>
+  <script>
+    function showGlobalError(message, source, lineno, colno, error) {
+      const overlay = document.getElementById('error-boundary-overlay');
+      const details = document.getElementById('error-boundary-details');
+      if (overlay && details) {
+        let errText = `Error: ${message}\n`;
+        if (source) errText += `Source: ${source}\n`;
+        if (lineno) errText += `Line: ${lineno}, Col: ${colno}\n`;
+        if (error && error.stack) {
+          errText += `Stack: ${error.stack}\n`;
+        }
+        details.textContent = errText;
+        overlay.style.display = 'block';
+      }
+    }
+    window.onerror = function(message, source, lineno, colno, error) {
+      showGlobalError(message, source, lineno, colno, error);
+      return false;
+    };
+    window.addEventListener('unhandledrejection', function(event) {
+      showGlobalError(event.reason ? event.reason.message : 'Unhandled Promise Rejection', null, null, null, event.reason);
+    });
+  </script>
 
   <style>
     /* Premium visual reset & custom scrollbar styling */
@@ -69,11 +100,35 @@
       { id: 8, name: "Lehenga Choli", category: "Girls", size: ["3-4Y","5-6Y","7-8Y"], price: 3500, stock: 6, image: "✨", description: "Stunning lehenga choli for weddings and festivals", featured: false },
     ];
 
+    // Safe localStorage wrapper to prevent crashes when running under file:// or with disabled cookies
+    const safeLocalStorage = {
+      getItem(key) {
+        try {
+          return localStorage.getItem(key);
+        } catch (e) {
+          console.warn("localStorage.getItem is blocked or unavailable:", e);
+          return null;
+        }
+      },
+      setItem(key, value) {
+        try {
+          localStorage.setItem(key, value);
+        } catch (e) {
+          console.warn("localStorage.setItem is blocked or unavailable:", e);
+        }
+      }
+    };
+
     function KaneezCreations() {
       const [view, setView] = useState("home"); // home, shop, product
       const [products, setProducts] = useState(() => {
-        const saved = localStorage.getItem("kaneez_products");
-        return saved ? JSON.parse(saved) : initialProducts;
+        try {
+          const saved = safeLocalStorage.getItem("kaneez_products");
+          return saved ? JSON.parse(saved) : initialProducts;
+        } catch (e) {
+          console.error("Failed to parse kaneez_products:", e);
+          return initialProducts;
+        }
       });
       const [cart, setCart] = useState([]);
       const [selectedProduct, setSelectedProduct] = useState(null);
@@ -109,7 +164,11 @@
       useEffect(() => {
         const handleStorage = (e) => {
           if (e.key === "kaneez_products") {
-            setProducts(e.newValue ? JSON.parse(e.newValue) : initialProducts);
+            try {
+              setProducts(e.newValue ? JSON.parse(e.newValue) : initialProducts);
+            } catch (err) {
+              console.error("Failed to parse storage update for products:", err);
+            }
           }
         };
         window.addEventListener("storage", handleStorage);
@@ -161,10 +220,15 @@
           };
 
           // Save order database records to localStorage (so admin.html can list them)
-          const existingOrders = localStorage.getItem("kaneez_orders");
-          const orders = existingOrders ? JSON.parse(existingOrders) : [];
+          let orders = [];
+          try {
+            const existingOrders = safeLocalStorage.getItem("kaneez_orders");
+            orders = existingOrders ? JSON.parse(existingOrders) : [];
+          } catch (e) {
+            console.error("Failed to parse existing orders:", e);
+          }
           orders.unshift(newOrder);
-          localStorage.setItem("kaneez_orders", JSON.stringify(orders));
+          safeLocalStorage.setItem("kaneez_orders", JSON.stringify(orders));
 
           // If method is WhatsApp, launch pre-filled WhatsApp message
           if (checkoutMethod === "whatsapp") {
@@ -281,7 +345,15 @@ Address: ${customerInfo.address}`;
           transition: "all 0.2s"
         }),
         checkoutLabel: { display: "block", fontSize: 11, fontWeight: 700, color: "#8e1a0e", marginBottom: 4, letterSpacing: 0.5, textTransform: "uppercase" },
-        formGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }
+        formGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 },
+        input: { width: "100%", padding: "12px 16px", border: "2px solid #fce4ec", borderRadius: 12, fontSize: 14, fontFamily: "inherit", background: "#fff", outline: "none", boxSizing: "border-box", color: "#2a1a0e" }
+      };
+
+      const renderProductImage = (image, name) => {
+        if (image && (image.startsWith('data') || image.startsWith('http') || image.includes('/'))) {
+          return <img src={image} alt={name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />;
+        }
+        return image;
       };
 
       const [selectedSize, setSelectedSize] = useState(null);
@@ -351,7 +423,7 @@ Address: ${customerInfo.address}`;
                     </div>
                   ) : cart.map(item => (
                     <div key={item.id+item.size} style={s.cartItem}>
-                      <div style={s.cartItemImg}>{item.image}</div>
+                      <div style={s.cartItemImg}>{renderProductImage(item.image, item.name)}</div>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontWeight: 700, fontSize: 14 }}>{item.name}</div>
                         <div style={{ fontSize: 12, color: "#a1887f" }}>Size: {item.size} × {item.qty}</div>
@@ -545,7 +617,7 @@ Address: ${customerInfo.address}`;
                 <div key={p.id} style={s.card} onClick={() => { setSelectedProduct(p); setSelectedSize(p.size[0]); setView("product"); }}
                   onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-4px)"; e.currentTarget.style.boxShadow = "0 8px 28px rgba(192,57,43,0.16)"; }}
                   onMouseLeave={e => { e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = ""; }}>
-                  <div style={s.cardImg}>{p.image}</div>
+                  <div style={s.cardImg}>{renderProductImage(p.image, p.name)}</div>
                   <div style={s.cardBody}>
                     <div style={s.cardCat}>{p.category}</div>
                     <div style={s.cardName}>{p.name}</div>
@@ -582,7 +654,7 @@ Address: ${customerInfo.address}`;
               <div key={p.id} style={s.card} onClick={() => { setSelectedProduct(p); setSelectedSize(p.size[0]); setView("product"); }}
                 onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-4px)"; e.currentTarget.style.boxShadow = "0 8px 28px rgba(192,57,43,0.16)"; }}
                 onMouseLeave={e => { e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = ""; }}>
-                <div style={s.cardImg}>{p.image}</div>
+                <div style={s.cardImg}>{renderProductImage(p.image, p.name)}</div>
                 <div style={s.cardBody}>
                   <div style={s.cardCat}>{p.category}</div>
                   <div style={s.cardName}>{p.name}</div>
@@ -606,7 +678,7 @@ Address: ${customerInfo.address}`;
               <button style={s.backBtn} onClick={() => setView("shop")}>← Back to Shop</button>
             </div>
             <div style={{ ...s.detailWrap, gridTemplateColumns: window.innerWidth < 600 ? "1fr" : "1fr 1fr" }}>
-              <div style={s.detailImg}>{p.image}</div>
+              <div style={s.detailImg}>{renderProductImage(p.image, p.name)}</div>
               <div>
                 <div style={s.detailCat}>{p.category}</div>
                 <div style={s.detailName}>{p.name}</div>

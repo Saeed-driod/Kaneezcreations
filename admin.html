@@ -10,12 +10,43 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Inter:wght@100..900&display=swap" rel="stylesheet">
   
-  <!-- React and ReactDOM CDNs (Production versions) -->
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <!-- React and ReactDOM CDNs (Production versions) using jsDelivr for superior reliability -->
+  <script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
   
-  <!-- Babel Standalone for in-browser JSX compilation -->
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- Babel Standalone for in-browser JSX compilation using jsDelivr -->
+  <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7/babel.min.js"></script>
+
+  <!-- Global Error Logger/Overlay -->
+  <div id="error-boundary-overlay" style="display:none; position:fixed; inset:0; background:rgba(42,26,14,0.95); color:#ff8a80; padding:30px; font-family:monospace; z-index:99999; overflow-y:auto; font-size:14px; line-height:1.5; border:5px solid #c0392b;">
+    <h2 style="color:#ff5252; margin-top:0; border-bottom:2px solid #ff5252; padding-bottom:10px; font-family:sans-serif;">⚠️ Kaneez Creations - Admin Panel Loading or Script Error</h2>
+    <p style="color:#fff; font-family:sans-serif;">An unexpected error occurred while loading the admin application. See details below:</p>
+    <pre id="error-boundary-details" style="background:#212121; padding:15px; border-radius:8px; border:1px solid #424242; white-space:pre-wrap; word-break:break-all; color:#ff8a80;"></pre>
+    <button onclick="window.location.reload()" style="background:#c0392b; color:#fff; border:none; padding:10px 20px; border-radius:4px; font-weight:bold; cursor:pointer; margin-top:15px; font-family:sans-serif; transition: background 0.2s;">Reload Page</button>
+  </div>
+  <script>
+    function showGlobalError(message, source, lineno, colno, error) {
+      const overlay = document.getElementById('error-boundary-overlay');
+      const details = document.getElementById('error-boundary-details');
+      if (overlay && details) {
+        let errText = `Error: ${message}\n`;
+        if (source) errText += `Source: ${source}\n`;
+        if (lineno) errText += `Line: ${lineno}, Col: ${colno}\n`;
+        if (error && error.stack) {
+          errText += `Stack: ${error.stack}\n`;
+        }
+        details.textContent = errText;
+        overlay.style.display = 'block';
+      }
+    }
+    window.onerror = function(message, source, lineno, colno, error) {
+      showGlobalError(message, source, lineno, colno, error);
+      return false;
+    };
+    window.addEventListener('unhandledrejection', function(event) {
+      showGlobalError(event.reason ? event.reason.message : 'Unhandled Promise Rejection', null, null, null, event.reason);
+    });
+  </script>
 
   <style>
     /* Reset & custom styling for admin layout */
@@ -67,14 +98,43 @@
 
     const ADMIN_PASS = "kaneez123";
 
+    // Safe localStorage wrapper to prevent crashes when running under file:// or with disabled cookies
+    const safeLocalStorage = {
+      getItem(key) {
+        try {
+          return localStorage.getItem(key);
+        } catch (e) {
+          console.warn("localStorage.getItem is blocked or unavailable:", e);
+          return null;
+        }
+      },
+      setItem(key, value) {
+        try {
+          localStorage.setItem(key, value);
+        } catch (e) {
+          console.warn("localStorage.setItem is blocked or unavailable:", e);
+        }
+      }
+    };
+
     function KaneezAdmin() {
       const [products, setProducts] = useState(() => {
-        const saved = localStorage.getItem("kaneez_products");
-        return saved ? JSON.parse(saved) : initialProducts;
+        try {
+          const saved = safeLocalStorage.getItem("kaneez_products");
+          return saved ? JSON.parse(saved) : initialProducts;
+        } catch (e) {
+          console.error("Failed to parse products from localStorage:", e);
+          return initialProducts;
+        }
       });
       const [orders, setOrders] = useState(() => {
-        const saved = localStorage.getItem("kaneez_orders");
-        return saved ? JSON.parse(saved) : [];
+        try {
+          const saved = safeLocalStorage.getItem("kaneez_orders");
+          return saved ? JSON.parse(saved) : [];
+        } catch (e) {
+          console.error("Failed to parse orders from localStorage:", e);
+          return [];
+        }
       });
       const [adminAuth, setAdminAuth] = useState(false);
       const [adminPass, setAdminPass] = useState("");
@@ -86,21 +146,33 @@
 
       // Persist databases in localStorage
       useEffect(() => {
-        localStorage.setItem("kaneez_products", JSON.stringify(products));
+        try {
+          safeLocalStorage.setItem("kaneez_products", JSON.stringify(products));
+        } catch (e) {
+          console.error("Failed to save products:", e);
+        }
       }, [products]);
 
       useEffect(() => {
-        localStorage.setItem("kaneez_orders", JSON.stringify(orders));
+        try {
+          safeLocalStorage.setItem("kaneez_orders", JSON.stringify(orders));
+        } catch (e) {
+          console.error("Failed to save orders:", e);
+        }
       }, [orders]);
 
       // Realtime listeners for changes in store tab
       useEffect(() => {
         const handleStorage = (e) => {
-          if (e.key === "kaneez_products") {
-            setProducts(e.newValue ? JSON.parse(e.newValue) : initialProducts);
-          }
-          if (e.key === "kaneez_orders") {
-            setOrders(e.newValue ? JSON.parse(e.newValue) : []);
+          try {
+            if (e.key === "kaneez_products") {
+              setProducts(e.newValue ? JSON.parse(e.newValue) : initialProducts);
+            }
+            if (e.key === "kaneez_orders") {
+              setOrders(e.newValue ? JSON.parse(e.newValue) : []);
+            }
+          } catch (err) {
+            console.error("Failed to sync storage update:", err);
           }
         };
         window.addEventListener("storage", handleStorage);
@@ -445,7 +517,7 @@
                         {products.map(p => (
                           <tr key={p.id}>
                             <td style={s.td}>
-                              {p.image && p.image.startsWith('data') ? (
+                              {p.image && (p.image.startsWith('data') || p.image.startsWith('http') || p.image.includes('/')) ? (
                                 <img src={p.image} alt={p.name} style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 4 }} />
                               ) : (
                                 <span style={{ fontSize: 28 }}>{p.image}</span>
@@ -506,8 +578,10 @@
                         <div style={s.formGroup}>
                           <label style={s.label}>Product Image</label>
                           <input type="file" accept="image/*" style={s.input} onChange={handleImageUpload} />
-                          {newProduct.image && (
+                          {newProduct.image && (newProduct.image.startsWith('data') || newProduct.image.startsWith('http') || newProduct.image.includes('/')) ? (
                             <img src={newProduct.image} alt="Preview" style={{marginTop:8, maxWidth:"100%", borderRadius:8}} />
+                          ) : (
+                            newProduct.image && <span style={{ fontSize: 40, display: "block", marginTop: 8 }}>{newProduct.image}</span>
                           )}
                         </div>
                     </div>
@@ -570,7 +644,14 @@
                         <tbody>
                           {lowStock.map(p => (
                             <tr key={p.id}>
-                              <td style={{ ...s.td, fontWeight: 700 }}><span style={{ fontSize: 24, marginRight: 10 }}>{p.image}</span> {p.name}</td>
+                              <td style={{ ...s.td, fontWeight: 700 }}>
+                                {p.image && (p.image.startsWith('data') || p.image.startsWith('http') || p.image.includes('/')) ? (
+                                  <img src={p.image} alt={p.name} style={{ width: 30, height: 30, objectFit: 'cover', borderRadius: 4, marginRight: 10, display: 'inline-block', verticalAlign: 'middle' }} />
+                                ) : (
+                                  <span style={{ fontSize: 24, marginRight: 10, display: 'inline-block', verticalAlign: 'middle' }}>{p.image}</span>
+                                )}
+                                <span style={{ verticalAlign: 'middle' }}>{p.name}</span>
+                              </td>
                               <td style={s.td}>
                                 <span style={{ background: "#fce4ec", color: "#c0392b", padding: "4px 12px", borderRadius: 20, fontSize: 12, fontWeight: 700, textTransform: "uppercase" }}>
                                   {p.category}
