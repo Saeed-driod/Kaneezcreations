@@ -89,16 +89,7 @@
   <script type="text/babel">
     const { useState, useEffect } = React;
 
-    const initialProducts = [
-      { id: 1, name: "Floral Frock", category: "Girls", size: ["2-3Y","4-5Y","6-7Y"], price: 1200, stock: 15, image: "👗", description: "Beautiful floral printed frock with lace detailing", featured: true },
-      { id: 2, name: "Denim Dungaree", category: "Boys", size: ["1-2Y","3-4Y","5-6Y"], price: 1500, stock: 10, image: "👖", description: "Comfortable denim dungaree perfect for playtime", featured: true },
-      { id: 3, name: "Embroidered Suit", category: "Girls", size: ["4-5Y","6-7Y","8-9Y"], price: 2200, stock: 8, image: "👘", description: "Elegant embroidered suit for special occasions", featured: true },
-      { id: 4, name: "T-Shirt & Shorts Set", category: "Boys", size: ["1-2Y","2-3Y","3-4Y"], price: 950, stock: 20, image: "👕", description: "Casual cotton t-shirt and shorts combo", featured: false },
-      { id: 5, name: "Party Frock", category: "Girls", size: ["3-4Y","5-6Y","7-8Y"], price: 2800, stock: 5, image: "🎀", description: "Gorgeous party frock with ribbon and net layers", featured: true },
-      { id: 6, name: "Kameez Shalwar", category: "Boys", size: ["2-3Y","4-5Y","6-7Y","8-9Y"], price: 1800, stock: 12, image: "🧥", description: "Traditional Pakistani kameez shalwar in premium fabric", featured: false },
-      { id: 7, name: "Baby Romper", category: "Infants", size: ["0-3M","3-6M","6-9M","9-12M"], price: 750, stock: 25, image: "🍼", description: "Soft cotton romper for newborns and infants", featured: true },
-      { id: 8, name: "Lehenga Choli", category: "Girls", size: ["3-4Y","5-6Y","7-8Y"], price: 3500, stock: 6, image: "✨", description: "Stunning lehenga choli for weddings and festivals", featured: false },
-    ];
+    const initialProducts = [];
 
     // Safe localStorage wrapper to prevent crashes when running under file:// or with disabled cookies
     const safeLocalStorage = {
